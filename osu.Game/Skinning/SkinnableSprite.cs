@@ -30,7 +30,7 @@ namespace osu.Game.Skinning
         private TextureStore textures { get; set; } = null!;
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.SpriteName), SettingControlType = typeof(SpriteSelectorControl))]
-        public Bindable<string> SpriteName { get; } = new Bindable<string>(string.Empty);
+        public virtual Bindable<string> SpriteName { get; } = new Bindable<string>(string.Empty);
 
         [Resolved]
         private ISkinSource source { get; set; } = null!;
@@ -42,7 +42,12 @@ namespace osu.Game.Skinning
         }
 
         public SkinnableSprite()
-            : base(new SpriteComponentLookup(string.Empty), ConfineMode.NoScaling)
+            : this(new SpriteComponentLookup(string.Empty))
+        {
+        }
+
+        protected SkinnableSprite(ISkinComponentLookup lookup)
+            : base(lookup, ConfineMode.NoScaling)
         {
             RelativeSizeAxes = Axes.None;
             AutoSizeAxes = Axes.Both;
@@ -85,6 +90,12 @@ namespace osu.Game.Skinning
 
         public partial class SpriteSelectorControl : SettingsDropdown<string>
         {
+            protected virtual IEnumerable<string> ApplyFilter(IEnumerable<string> filenames, Skin skin)
+            {
+                return filenames.Where(f => SupportedExtensions.IMAGE_EXTENSIONS.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                                .Distinct();
+            }
+
             protected override void LoadComplete()
             {
                 base.LoadComplete();
@@ -95,9 +106,7 @@ namespace osu.Game.Skinning
                 var highestPrioritySkin = getHighestPriorityUserSkin(((SkinnableSprite)SettingSourceObject).source.AllSources) as Skin;
 
                 string[]? availableFiles = highestPrioritySkin?.SkinInfo.PerformRead(
-                    s => s.Files
-                          .Where(f => SupportedExtensions.IMAGE_EXTENSIONS.Contains(Path.GetExtension(f.Filename).ToLowerInvariant()))
-                          .Select(f => f.Filename).Distinct()).ToArray();
+                    s => ApplyFilter(s.Files.Select(f => f.Filename), highestPrioritySkin)).ToArray();
 
                 if (availableFiles?.Length > 0)
                     Items = availableFiles;

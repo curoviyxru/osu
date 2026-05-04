@@ -158,6 +158,12 @@ namespace osu.Game.Skinning
             }
         }
 
+        public static bool IsAnimation(this ISkin? source, string componentName, string animationSeparator = "-")
+        {
+            var textures = source.GetTextures(componentName, default, default, true, animationSeparator, null, out _);
+            return textures.Length > 1;
+        }
+
         /// <summary>
         /// Returns the numeric overlap of number sprites to use.
         /// A positive number will bring the number sprites closer together, while a negative number
