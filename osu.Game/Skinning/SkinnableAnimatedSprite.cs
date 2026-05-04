@@ -23,6 +23,14 @@ namespace osu.Game.Skinning
         [SettingSource("Looping", "Whether the animation should be looping")]
         public Bindable<bool> Looping { get; } = new BindableBool(true);
 
+        [SettingSource("Framerate", "Specifies the framerate of the animation affecting its speed")]
+        public Bindable<double> Framerate { get; } = new BindableDouble(60)
+        {
+            MinValue = 1,
+            MaxValue = 120,
+            Precision = 1
+        };
+
         public SkinnableAnimatedSprite()
             : base(new AnimatedSpriteComponentLookup(string.Empty))
         {
@@ -32,16 +40,25 @@ namespace osu.Game.Skinning
                 if (IsLoaded)
                     SkinChanged(CurrentSkin);
             });
+
+            Framerate.BindValueChanged(framerate =>
+            {
+                ((AnimatedSpriteComponentLookup)ComponentLookup).Framerate = framerate.NewValue;
+                if (IsLoaded)
+                    SkinChanged(CurrentSkin);
+            });
         }
 
         internal class AnimatedSpriteComponentLookup : SpriteComponentLookup
         {
             public bool Looping { get; set; }
+            public double Framerate { get; set; }
 
-            public AnimatedSpriteComponentLookup(string textureName, Vector2? maxSize = null, bool looping = true)
+            public AnimatedSpriteComponentLookup(string textureName, Vector2? maxSize = null, bool looping = true, double framerate = 60)
                 : base(textureName, maxSize)
             {
                 Looping = looping;
+                Framerate = framerate;
             }
         }
 
