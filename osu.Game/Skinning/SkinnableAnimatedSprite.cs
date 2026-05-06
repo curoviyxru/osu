@@ -49,13 +49,11 @@ namespace osu.Game.Skinning
 
             Framerate.BindValueChanged(framerate =>
             {
-                if (framerate.NewValue == 0)
-                {
-                    Framerate.SetDefault();
-                    return;
-                }
+                int targetFramerate = framerate.NewValue;
+                if (targetFramerate <= 0)
+                    targetFramerate = Framerate.Default;
 
-                ((AnimatedSpriteComponentLookup)ComponentLookup).Framerate = framerate.NewValue;
+                ((AnimatedSpriteComponentLookup)ComponentLookup).Framerate = targetFramerate;
                 if (IsLoaded)
                     SkinChanged(CurrentSkin);
             });
@@ -81,7 +79,7 @@ namespace osu.Game.Skinning
                 : base(textureName, maxSize)
             {
                 Looping = looping;
-                Framerate = framerate > 0 ? framerate : 60;
+                Framerate = framerate;
             }
         }
 
