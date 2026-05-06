@@ -5,10 +5,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Game.Configuration;
 using osu.Game.Localisation.SkinComponents;
 using osuTK;
+using LegacySetting = osu.Game.Skinning.SkinConfiguration.LegacySetting;
 
 namespace osu.Game.Skinning
 {
@@ -17,6 +19,9 @@ namespace osu.Game.Skinning
     /// </summary>
     public partial class SkinnableAnimatedSprite : SkinnableSprite
     {
+        [Resolved]
+        private ISkinSource source { get; set; } = null!;
+
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.SpriteName), SettingControlType = typeof(AnimatedSpriteSelectorControl))]
         public override Bindable<string> SpriteName { get; } = new Bindable<string>(string.Empty);
 
@@ -24,9 +29,10 @@ namespace osu.Game.Skinning
         public Bindable<bool> Looping { get; } = new BindableBool(true);
 
         [SettingSource("Framerate", "Specifies the framerate of the animation affecting its speed")]
-        public Bindable<double> Framerate { get; } = new BindableDouble(60)
+        public Bindable<int> Framerate { get; } = new BindableInt
         {
-            MinValue = 1,
+            // TODO find out how to do this less hacky
+            MinValue = 0,
             MaxValue = 120,
             Precision = 1
         };
@@ -43,10 +49,27 @@ namespace osu.Game.Skinning
 
             Framerate.BindValueChanged(framerate =>
             {
+                if (framerate.NewValue == 0)
+                {
+                    Framerate.SetDefault();
+                    return;
+                }
+
                 ((AnimatedSpriteComponentLookup)ComponentLookup).Framerate = framerate.NewValue;
                 if (IsLoaded)
                     SkinChanged(CurrentSkin);
             });
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            var framerateSetting = source.GetConfig<LegacySetting, int>(LegacySetting.AnimationFramerate);
+            Framerate.Default = framerateSetting?.Value ?? 60;
+
+            if (Framerate.Value == 0)
+                Framerate.SetDefault();
         }
 
         internal class AnimatedSpriteComponentLookup : SpriteComponentLookup
@@ -58,7 +81,7 @@ namespace osu.Game.Skinning
                 : base(textureName, maxSize)
             {
                 Looping = looping;
-                Framerate = framerate;
+                Framerate = framerate > 0 ? framerate : 60;
             }
         }
 
