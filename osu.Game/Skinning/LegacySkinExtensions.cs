@@ -46,6 +46,8 @@ namespace osu.Game.Skinning
                     {
                         DefaultFrameLength = frameLength ?? getFrameLength(retrievalSource, applyConfigFrameRate, textures),
                         Loop = looping,
+                        Width = textures.Select(t => t.Width / t.ScaleAdjust).Max(),
+                        Height = textures.Select(t => t.Height / t.ScaleAdjust).Max(),
                     };
 
                     foreach (var t in textures)
