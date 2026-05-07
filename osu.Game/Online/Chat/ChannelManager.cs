@@ -18,6 +18,7 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Framework.Screens;
 using osu.Framework.Threading;
 using osu.Game.Database;
 using osu.Game.Extensions;
@@ -30,6 +31,8 @@ using osu.Game.Online.Multiplayer;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Chat.Listing;
 using osu.Game.Overlays.Notifications;
+using osu.Game.Screens;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Online.Chat
 {
@@ -84,6 +87,10 @@ namespace osu.Game.Online.Chat
         [Resolved(CanBeNull = true)]
         [CanBeNull]
         private MultiplayerClient multiplayerClient { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        [CanBeNull]
+        private IPerformFromScreenRunner performer { get; set; }
 
         [Resolved(CanBeNull = true)]
         [CanBeNull]
@@ -338,12 +345,7 @@ namespace osu.Game.Online.Chat
                         break;
                     }
 
-                    var request = new GetUserRequest(content);
-                    request.Success += OpenPrivateChannel;
-                    request.Failure += e => target.AddNewMessages(
-                        new ErrorMessage(e.InnerException?.Message == @"NotFound" ? $"User '{content}' was not found." : $"Could not fetch user '{content}'."));
-
-                    api.Queue(request);
+                    performUserAction(OpenPrivateChannel);
                     break;
 
                 case @"roll":
@@ -410,13 +412,41 @@ namespace osu.Game.Online.Chat
                     });
                     break;
 
+                case "delfriend":
+                    performUserAction(user => deleteFriend(target, user));
+                    break;
+
+                case "addfriend":
+                    performUserAction(user => addFriend(target, user));
+                    break;
+
+                case @"watch":
+                    performUserAction(user => performer?.PerformFromScreen(s => s.Push(new SoloSpectatorScreen(user))));
+                    break;
+
                 case @"help":
-                    target.AddNewMessages(new InfoMessage("Supported commands: /help, /me [action], /join [channel], /chat [user], /np, /savelog, /roll [2-100] (multiplayer only)"));
+                    target.AddNewMessages(new InfoMessage("Supported commands: /help, /me [action], /join [channel], /chat [user], /watch [user], /delfriend [user], /addfriend [user], /np, /savelog, /roll [2-100] (multiplayer only)"));
                     break;
 
                 default:
                     target.AddNewMessages(new ErrorMessage($@"""/{command}"" is not supported! For a list of supported commands see /help"));
                     break;
+            }
+
+            void performUserAction(Action<APIUser> action)
+            {
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    target.AddNewMessages(new ErrorMessage($"Usage: /{command} [user]"));
+                    return;
+                }
+
+                var request = new GetUserRequest(content);
+                request.Success += user => action(user);
+                request.Failure += e => target.AddNewMessages(
+                    new ErrorMessage(e.InnerException?.Message == @"NotFound" ? $"User '{content}' was not found." : $"Could not fetch user '{content}'."));
+
+                api.Queue(request);
             }
         }
 
@@ -784,6 +814,64 @@ namespace osu.Game.Online.Chat
             }
 
             return filename;
+        }
+
+        private void deleteFriend(Channel target, APIUser user)
+        {
+            if (localUser.Value.OnlineID == user.OnlineID)
+                return;
+
+            APIRelation friend = api.LocalUserState.Friends.FirstOrDefault(u => user.OnlineID == u.TargetID);
+
+            if (friend == null || friend.RelationType != RelationType.Friend)
+            {
+                target.AddNewMessages(new InfoMessage($"You are no friends with '{user.Username}'."));
+                return;
+            }
+
+            APIRequest req = new DeleteFriendRequest(user.OnlineID);
+
+            req.Success += () =>
+            {
+                target.AddNewMessages(new InfoMessage($"You are no longer friends with '{user.Username}'."));
+                api.LocalUserState.UpdateFriends();
+            };
+
+            req.Failure += _ =>
+            {
+                target.AddNewMessages(new ErrorMessage($"Could not remove user '{user.Username}' from friends."));
+            };
+
+            api.Queue(req);
+        }
+
+        private void addFriend(Channel target, APIUser user)
+        {
+            if (localUser.Value.OnlineID == user.OnlineID)
+                return;
+
+            APIRelation friend = api.LocalUserState.Friends.FirstOrDefault(u => user.OnlineID == u.TargetID);
+
+            if (friend != null && friend.RelationType == RelationType.Friend)
+            {
+                target.AddNewMessages(new InfoMessage($"You are already friends with '{user.Username}'."));
+                return;
+            }
+
+            APIRequest req = new AddFriendRequest(user.OnlineID);
+
+            req.Success += () =>
+            {
+                target.AddNewMessages(new InfoMessage($"You are now friends with '{user.Username}'."));
+                api.LocalUserState.UpdateFriends();
+            };
+
+            req.Failure += _ =>
+            {
+                target.AddNewMessages(new ErrorMessage($"Could not add user '{user.Username}' to friends."));
+            };
+
+            api.Queue(req);
         }
 
         protected override void Dispose(bool isDisposing)
