@@ -15,6 +15,7 @@ namespace osu.Game.Overlays.Settings.Sections.Maintenance
         protected override LocalisableString Header => CommonStrings.Beatmaps;
 
         private SettingsButtonV2 deleteBeatmapsButton = null!;
+        private SettingsButtonV2 deleteUnplayedBeatmapsButton = null!;
         private SettingsButtonV2 deleteBeatmapVideosButton = null!;
         private SettingsButtonV2 resetOffsetsButton = null!;
         private SettingsButtonV2 restoreButton = null!;
@@ -32,6 +33,19 @@ namespace osu.Game.Overlays.Settings.Sections.Maintenance
                     {
                         deleteBeatmapsButton.Enabled.Value = false;
                         Task.Run(() => beatmaps.Delete()).ContinueWith(_ => Schedule(() => deleteBeatmapsButton.Enabled.Value = true));
+                    }, DeleteConfirmationContentStrings.Beatmaps));
+                }
+            });
+
+            Add(deleteUnplayedBeatmapsButton = new DangerousSettingsButtonV2
+            {
+                Text = "Delete ALL UNPLAYED beatmaps",
+                Action = () =>
+                {
+                    dialogOverlay?.Push(new MassDeleteConfirmationDialog(() =>
+                    {
+                        deleteUnplayedBeatmapsButton.Enabled.Value = false;
+                        Task.Run(() => beatmaps.DeleteUnplayed()).ContinueWith(_ => Schedule(() => deleteUnplayedBeatmapsButton.Enabled.Value = true));
                     }, DeleteConfirmationContentStrings.Beatmaps));
                 }
             });

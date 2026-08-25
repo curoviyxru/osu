@@ -423,6 +423,25 @@ namespace osu.Game.Beatmaps
             });
         }
 
+        public void DeleteUnplayed(bool silent = false)
+        {
+            Realm.Run(r =>
+            {
+                var items = r.All<BeatmapSetInfo>().Where(s => !s.DeletePending && !s.Protected);
+                var list = new List<BeatmapSetInfo>();
+
+                foreach (var beatmap in items)
+                {
+                    if (beatmap.Beatmaps.All(b => b.LastPlayed == null))
+                    {
+                        list.Add(beatmap);
+                    }
+                }
+
+                Delete(list, silent);
+            });
+        }
+
         /// <summary>
         /// Delete a beatmap difficulty immediately.
         /// </summary>
